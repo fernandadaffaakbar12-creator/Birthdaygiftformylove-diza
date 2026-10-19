@@ -3,233 +3,524 @@
 // ==========================================
 (function () {
     function initMiniGame() {
-        const gameArea = document.getElementById('game-area');
-        const player = document.getElementById('player-obj');
         const miniGameScreen = document.getElementById('mini-game-screen');
+        const gameArea = document.getElementById('game-area');
+        const player = document.getElementById('player-catcher');
+        const fallingContainer = document.getElementById('falling-items-container');
+        const fxLayer = document.getElementById('fx-layer');
+        const bouquetCountEl = document.getElementById('bouquet-count');
+        const bouquetSlots = document.querySelectorAll('.b-slot');
         const progressFill = document.getElementById('game-progress-fill');
-        const safePath = document.getElementById('safe-path');
-        const sparkleContainer = gameArea ? gameArea.querySelector('.track-sparkles') : null;
+        const gameToast = document.getElementById('game-toast');
+        const winOverlay = document.getElementById('game-win-overlay');
+        const btnLeft = document.getElementById('btn-move-left');
+        const btnRight = document.getElementById('btn-move-right');
 
-        if (!gameArea || !player || !miniGameScreen || !safePath) return;
-
-        let isDragging = false;
-        let currentPathLength = 0;
-        let pendingClientX = 0;
-        let pendingClientY = 0;
-        let rafId = null;
-        let sparkleCounter = 0;
-
-        // Offset player: tengah cart
-        const CART_HALF_W = 24;
-        const CART_HALF_H = 26;
+        if (!gameArea || !player || !miniGameScreen) return;
 
         // =============================================
-        // PRE-CACHE: Hitung semua titik path SEKALI saat init
-        // Ini menghindari getPointAtLength() saat drag
+        // AUDIO SYNTHESIZER (Web Audio API - Zero Assets)
         // =============================================
-        const totalLength = safePath.getTotalLength();
-        const SAMPLES = 200;
-        const cachedPoints = []; // Array of { x, y, len }
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
 
-        for (let i = 0; i <= SAMPLES; i++) {
-            const len = (i / SAMPLES) * totalLength;
-            const pt = safePath.getPointAtLength(len);
-            cachedPoints.push({ x: pt.x, y: pt.y, len: len });
+        function getAudioContext() {
+            if (!audioCtx && AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(() => { });
+            }
+            return audioCtx;
         }
 
-        // Cache monster elements
-        const monsters = gameArea.querySelectorAll('.monster');
+        function playCatchSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            try {
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.12); // A5
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.28);
+            } catch (e) { }
+        }
 
-        // Background particles
+        function playBombSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            try {
+                const now = ctx.currentTime;
+                // Low pitch drop
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.exponentialRampToValueAtTime(35, now + 0.4);
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.48);
+            } catch (e) { }
+        }
+
+        function playWinSound() {
+            const ctx = getAudioContext();
+            if (!ctx) return;
+            try {
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                const now = ctx.currentTime;
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    const start = now + idx * 0.12;
+                    osc.frequency.setValueAtTime(freq, start);
+                    gain.gain.setValueAtTime(0.28, start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(start);
+                    osc.stop(start + 0.4);
+                });
+            } catch (e) { }
+        }
+
+        // =============================================
+        // GAME STATE
+        // =============================================
+        const TARGET_BOUQUETS = 5;
+        let bouquetsCaught = 0;
+        let isGameOver = false;
+        let animationFrameId = null;
+        let spawnIntervalId = null;
+        let items = [];
+        let toastTimeout = null;
+
+        let arenaWidth = gameArea.clientWidth || 340;
+        let arenaHeight = gameArea.clientHeight || 350;
+        let playerX = arenaWidth / 2;
+        let targetPlayerX = arenaWidth / 2;
+        const PLAYER_HALF_W = 34;
+
+        function updateArenaDimensions() {
+            const rect = gameArea.getBoundingClientRect();
+            if (rect.width > 0) arenaWidth = rect.width;
+            if (rect.height > 0) arenaHeight = rect.height;
+            targetPlayerX = Math.max(PLAYER_HALF_W, Math.min(arenaWidth - PLAYER_HALF_W, targetPlayerX));
+        }
+        updateArenaDimensions();
+        window.addEventListener('resize', updateArenaDimensions);
+
+        // Background floating particles
         createBgParticles();
-
         function createBgParticles() {
             const container = miniGameScreen.querySelector('.game-bg-particles');
-            if (!container) return;
-            for (let i = 0; i < 25; i++) {
+            if (!container || container.children.length > 0) return;
+            for (let i = 0; i < 20; i++) {
                 const p = document.createElement('div');
                 p.classList.add('game-bg-particle');
                 p.style.left = Math.random() * 100 + '%';
                 p.style.top = Math.random() * 100 + '%';
                 p.style.animationDelay = (Math.random() * 6) + 's';
                 p.style.animationDuration = (4 + Math.random() * 4) + 's';
-                p.style.width = (2 + Math.random() * 4) + 'px';
+                p.style.width = (3 + Math.random() * 3) + 'px';
                 p.style.height = p.style.width;
                 container.appendChild(p);
             }
         }
 
-        function createTrackSparkle(pixX, pixY) {
-            if (!sparkleContainer) return;
-            const s = document.createElement('div');
-            s.className = 'track-sparkle';
-            s.style.cssText = 'left:' + (pixX + (Math.random() - 0.5) * 16) + 'px;top:' + (pixY + (Math.random() - 0.5) * 16) + 'px';
-            sparkleContainer.appendChild(s);
-            setTimeout(() => s.remove(), 1500);
-        }
-
-        // Cari titik terdekat dari cached points (SANGAT CEPAT - hanya array loop)
-        function findClosestCached(svgX, svgY) {
-            let bestDist = Infinity;
-            let bestIdx = 0;
-
-            for (let i = 0; i < cachedPoints.length; i++) {
-                const p = cachedPoints[i];
-                const dx = p.x - svgX;
-                const dy = p.y - svgY;
-                const d = dx * dx + dy * dy;
-                if (d < bestDist) {
-                    bestDist = d;
-                    bestIdx = i;
+        function showToast(text, className) {
+            if (!gameToast) return;
+            gameToast.textContent = text;
+            gameToast.className = 'game-toast ' + (className || '');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                if (!isGameOver && gameToast) {
+                    gameToast.textContent = 'Mai kaer! ' + (TARGET_BOUQUETS - bouquetsCaught) + ' Buquê tan! 💐';
+                    gameToast.className = 'game-toast';
                 }
-            }
-
-            return cachedPoints[bestIdx];
+            }, 2500);
         }
 
-        // Letakkan player di titik path
-        function placePlayer(svgX, svgY, len) {
-            const rect = gameArea.getBoundingClientRect();
-            const pixX = (svgX / 500) * rect.width;
-            const pixY = (svgY / 250) * rect.height;
+        // =============================================
+        // SPAWN FALLING ITEMS (Bouquets & Bombs)
+        // =============================================
+        let spawnCounter = 0;
 
-            player.style.left = (pixX - CART_HALF_W) + 'px';
-            player.style.top = (pixY - CART_HALF_H) + 'px';
+        function spawnFallingItem() {
+            if (isGameOver || !fallingContainer) return;
+            spawnCounter++;
 
-            currentPathLength = len;
-
-            // Progress bar
-            if (progressFill) {
-                progressFill.style.width = ((len / totalLength) * 100) + '%';
+            // Ensure first 2 items are always bouquets so user gets familiar
+            let isBomb = false;
+            if (spawnCounter > 2) {
+                // ~25% chance of bomb
+                isBomb = Math.random() < 0.28;
             }
 
-            // Sparkle hanya setiap 3 frame
-            sparkleCounter++;
-            if (sparkleCounter % 3 === 0) {
-                createTrackSparkle(pixX, pixY);
+            const itemEl = document.createElement('div');
+            itemEl.className = 'falling-item ' + (isBomb ? 'falling-bomb' : 'falling-bouquet');
+
+            if (isBomb) {
+                itemEl.innerHTML = '<div class="bomb-wrap"><div class="bomb-spark">🔥</div><div class="bomb-body">💣</div></div>';
+            } else {
+                itemEl.innerHTML = '<img src="img/bouquet.png" alt="Bouquet" draggable="false">';
             }
 
-            return { pixX, pixY };
+            const itemWidth = 44;
+            const startX = Math.random() * (arenaWidth - itemWidth - 24) + 12;
+            const startY = -48;
+            const speed = isBomb ? (2.4 + Math.random() * 0.8) : (2.2 + Math.random() * 0.7);
+            const seed = Math.random() * 100;
+
+            fallingContainer.appendChild(itemEl);
+
+            items.push({
+                el: itemEl,
+                type: isBomb ? 'bomb' : 'bouquet',
+                x: startX,
+                y: startY,
+                speed: speed,
+                seed: seed,
+                width: itemWidth,
+                height: itemWidth
+            });
         }
 
-        function resetPlayer() {
-            currentPathLength = 0;
-            const p = cachedPoints[0];
-            placePlayer(p.x, p.y, 0);
-            player.style.transform = 'scale(1)';
-            isDragging = false;
-            if (progressFill) progressFill.style.width = '0%';
-            if (navigator.vibrate) navigator.vibrate(200);
+        // =============================================
+        // FLOATING EFFECTS (Particles & Popups)
+        // =============================================
+        function createCatchFx(x, y) {
+            if (!fxLayer) return;
+            const fx = document.createElement('div');
+            fx.className = 'fx-float-score';
+            fx.textContent = '+1 💐';
+            fx.style.left = x + 'px';
+            fx.style.top = y + 'px';
+            fxLayer.appendChild(fx);
+            setTimeout(() => fx.remove(), 800);
         }
 
-        function checkMonsterCollision(pixX, pixY) {
-            const aRect = gameArea.getBoundingClientRect();
+        function createExplosionFx(x, y) {
+            if (!fxLayer) return;
+            const exp = document.createElement('div');
+            exp.className = 'fx-explosion';
+            exp.textContent = '💥';
+            exp.style.left = x + 'px';
+            exp.style.top = y + 'px';
+            fxLayer.appendChild(exp);
+            setTimeout(() => exp.remove(), 600);
+        }
 
-            for (const monster of monsters) {
-                const mRect = monster.getBoundingClientRect();
-                const mx = (mRect.left + mRect.width * 0.5) - aRect.left;
-                const my = (mRect.top + mRect.height * 0.5) - aRect.top;
-                const dx = pixX - mx;
-                const dy = pixY - my;
+        // =============================================
+        // VICTORY CONFETTI
+        // =============================================
+        function triggerConfettiBurst() {
+            if (!gameArea) return;
+            const colors = ['#ff1493', '#ff69b4', '#ffb6c1', '#ffd700', '#ffffff', '#ff4081'];
+            const icons = ['🌸', '💐', '✨', '💖', '🎉'];
 
-                if (dx * dx + dy * dy < 324) { // 18^2 = 324
-                    resetPlayer();
-                    return true;
+            for (let i = 0; i < 30; i++) {
+                const c = document.createElement('div');
+                c.style.position = 'absolute';
+                c.style.left = '50%';
+                c.style.top = '50%';
+                c.style.fontSize = (12 + Math.random() * 14) + 'px';
+                c.style.color = colors[Math.floor(Math.random() * colors.length)];
+                c.style.pointerEvents = 'none';
+                c.style.zIndex = '60';
+                c.textContent = icons[Math.floor(Math.random() * icons.length)];
+
+                const destX = (Math.random() - 0.5) * (arenaWidth * 0.9);
+                const destY = (Math.random() - 0.5) * (arenaHeight * 0.8) - 40;
+                const rot = (Math.random() - 0.5) * 720;
+                const duration = 0.8 + Math.random() * 0.8;
+
+                c.style.transition = 'all ' + duration + 's cubic-bezier(0.25, 1, 0.5, 1)';
+                c.style.transform = 'translate(-50%, -50%) scale(0.5)';
+                c.style.opacity = '1';
+
+                gameArea.appendChild(c);
+
+                requestAnimationFrame(() => {
+                    c.style.transform = 'translate(' + destX + 'px, ' + destY + 'px) rotate(' + rot + 'deg) scale(' + (1 + Math.random() * 0.5) + ')';
+                    c.style.opacity = '0';
+                });
+
+                setTimeout(() => c.remove(), duration * 1000);
+            }
+        }
+
+        // =============================================
+        // WIN HANDLER -> TRANSITION TO NEXT PAGE
+        // =============================================
+        function handleWin() {
+            isGameOver = true;
+            if (spawnIntervalId) clearInterval(spawnIntervalId);
+
+            // Clean up remaining bombs
+            items.forEach(item => {
+                if (item.type === 'bomb' && item.el) {
+                    item.el.remove();
                 }
-            }
-            return false;
-        }
+            });
+            items = items.filter(item => item.type !== 'bomb');
 
-        function checkFinish() {
-            if (currentPathLength >= totalLength * 0.95) {
-                isDragging = false;
+            playWinSound();
+            triggerConfettiBurst();
+            showToast('🎉 Horeee! Buquê 5 konsege halibur hotu ona! 💐🎉', 'toast-win');
+
+            if (winOverlay) {
+                winOverlay.style.display = 'flex';
+            }
+
+            // Transition to landing-page after celebration
+            setTimeout(() => {
+                miniGameScreen.style.transition = 'opacity 1s ease';
+                miniGameScreen.style.opacity = '0';
                 setTimeout(() => {
-                    miniGameScreen.style.transition = 'opacity 1s ease';
-                    miniGameScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        miniGameScreen.style.display = 'none';
-                        const landingPage = document.getElementById('landing-page');
-                        if (landingPage) landingPage.style.display = '';
-                    }, 1000);
-                }, 300);
-                return true;
-            }
-            return false;
+                    miniGameScreen.style.display = 'none';
+                    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                    const landingPage = document.getElementById('landing-page');
+                    if (landingPage) landingPage.style.display = '';
+                }, 1000);
+            }, 1800);
         }
 
-        // Frame update — dipanggil via requestAnimationFrame
-        function frameUpdate() {
-            rafId = null;
-            if (!isDragging) return;
+        // =============================================
+        // GAME LOOP (RequestAnimationFrame)
+        // =============================================
+        function gameLoop() {
+            if (isGameOver) return;
 
+            // Smooth lerp player movement
+            playerX += (targetPlayerX - playerX) * 0.35;
+            player.style.left = playerX + 'px';
+
+            // Catch zone boundaries (around Stitch's basket/hands)
+            const catchYTop = arenaHeight - 74;
+            const catchYBottom = arenaHeight - 8;
+            const catchRadius = 38;
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+
+                item.y += item.speed;
+                // Gentle floating sway
+                item.x += Math.sin((item.y + item.seed) * 0.04) * 0.7;
+                item.x = Math.max(8, Math.min(arenaWidth - item.width - 8, item.x));
+
+                item.el.style.transform = 'translate(' + item.x + 'px, ' + item.y + 'px)';
+
+                const itemCenterY = item.y + item.height * 0.5;
+                const itemCenterX = item.x + item.width * 0.5;
+
+                // Check collision with player
+                if (itemCenterY >= catchYTop && itemCenterY <= catchYBottom) {
+                    const dist = Math.abs(itemCenterX - playerX);
+
+                    if (dist < catchRadius) {
+                        // HIT!
+                        if (item.type === 'bouquet') {
+                            // Caught Bouquet!
+                            bouquetsCaught++;
+                            playCatchSound();
+                            createCatchFx(itemCenterX, itemCenterY);
+
+                            // Bounce animation for Stitch
+                            player.classList.remove('catch-bounce');
+                            void player.offsetWidth;
+                            player.classList.add('catch-bounce');
+
+                            // Update score & slots
+                            if (bouquetCountEl) bouquetCountEl.textContent = bouquetsCaught;
+                            if (progressFill) progressFill.style.width = ((bouquetsCaught / TARGET_BOUQUETS) * 100) + '%';
+                            if (bouquetSlots[bouquetsCaught - 1]) {
+                                bouquetSlots[bouquetsCaught - 1].classList.add('active');
+                            }
+
+                            showToast('+1 Bouquet! (' + bouquetsCaught + '/' + TARGET_BOUQUETS + ') 💐', 'toast-catch');
+
+                            // Remove caught item
+                            item.el.remove();
+                            items.splice(i, 1);
+
+                            if (bouquetsCaught >= TARGET_BOUQUETS) {
+                                handleWin();
+                                return;
+                            }
+                            continue;
+                        } else if (item.type === 'bomb') {
+                            // Caught Bomb!
+                            playBombSound();
+                            createExplosionFx(itemCenterX, itemCenterY);
+                            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+                            // Arena shake
+                            gameArea.classList.remove('shake-arena');
+                            void gameArea.offsetWidth;
+                            gameArea.classList.add('shake-arena');
+
+                            // Stitch dizzy animation
+                            player.classList.add('dizzy');
+                            setTimeout(() => player.classList.remove('dizzy'), 900);
+
+                            // RESET SCORE TO 0!
+                            bouquetsCaught = 0;
+                            if (bouquetCountEl) bouquetCountEl.textContent = '0';
+                            if (progressFill) progressFill.style.width = '0%';
+                            bouquetSlots.forEach(slot => slot.classList.remove('active'));
+
+                            showToast('💥 Monu ba BOM! Buquê fila fali ba 0! Kuidadu diak, eee~ 😭', 'toast-bomb');
+
+                            // Remove exploded bomb
+                            item.el.remove();
+                            items.splice(i, 1);
+                            continue;
+                        }
+                    }
+                }
+
+                // Remove when fallen off screen
+                if (item.y > arenaHeight + 20) {
+                    item.el.remove();
+                    items.splice(i, 1);
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // =============================================
+        // CONTROLS (Touch, Pointer, Keyboard & Buttons)
+        // =============================================
+        function handlePointer(clientX) {
+            if (isGameOver) return;
             const rect = gameArea.getBoundingClientRect();
-            // Konversi client coords ke SVG coords
-            const svgX = ((pendingClientX - rect.left) / rect.width) * 500;
-            const svgY = ((pendingClientY - rect.top) / rect.height) * 250;
-
-            // Cari titik terdekat (super cepat, hanya array loop)
-            const closest = findClosestCached(svgX, svgY);
-
-            // Letakkan player
-            const { pixX, pixY } = placePlayer(closest.x, closest.y, closest.len);
-
-            // Cek tabrakan
-            if (checkMonsterCollision(pixX, pixY)) return;
-            checkFinish();
+            const x = clientX - rect.left;
+            targetPlayerX = Math.max(PLAYER_HALF_W, Math.min(arenaWidth - PLAYER_HALF_W, x));
         }
 
-        // Trigger frame update (throttled via rAF)
-        function scheduleUpdate(clientX, clientY) {
-            pendingClientX = clientX;
-            pendingClientY = clientY;
-            if (!rafId) {
-                rafId = requestAnimationFrame(frameUpdate);
+        gameArea.addEventListener('pointerdown', (e) => {
+            getAudioContext();
+            handlePointer(e.clientX);
+        });
+
+        gameArea.addEventListener('pointermove', (e) => {
+            if (e.buttons > 0 || e.pointerType === 'touch' || e.pointerType === 'pen') {
+                handlePointer(e.clientX);
+            }
+        });
+
+        // Keyboard Controls
+        const keys = { left: false, right: false };
+        let keyInterval = null;
+
+        function startKeyLoop() {
+            if (keyInterval) return;
+            keyInterval = setInterval(() => {
+                if (isGameOver) return;
+                const STEP = 8;
+                if (keys.left) targetPlayerX = Math.max(PLAYER_HALF_W, targetPlayerX - STEP);
+                if (keys.right) targetPlayerX = Math.min(arenaWidth - PLAYER_HALF_W, targetPlayerX + STEP);
+            }, 16);
+        }
+
+        function stopKeyLoop() {
+            if (!keys.left && !keys.right && keyInterval) {
+                clearInterval(keyInterval);
+                keyInterval = null;
             }
         }
 
-        // Inisialisasi posisi awal
-        const startPt = cachedPoints[0];
-        placePlayer(startPt.x, startPt.y, 0);
-
-        // --- Mouse Events ---
-        player.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            player.style.transform = 'scale(1.08)';
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            scheduleUpdate(e.clientX, e.clientY);
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                player.style.transform = 'scale(1)';
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                keys.left = true;
+                startKeyLoop();
+            } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                keys.right = true;
+                startKeyLoop();
             }
         });
 
-        // --- Touch Events ---
-        player.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            player.style.transform = 'scale(1.08)';
-            e.preventDefault();
-        }, { passive: false });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            e.preventDefault();
-            const t = e.touches[0];
-            scheduleUpdate(t.clientX, t.clientY);
-        }, { passive: false });
-
-        document.addEventListener('touchend', () => {
-            if (isDragging) {
-                isDragging = false;
-                player.style.transform = 'scale(1)';
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                keys.left = false;
+                stopKeyLoop();
+            } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                keys.right = false;
+                stopKeyLoop();
             }
         });
+
+        // Touch Pill Buttons (Left & Right)
+        function setupHoldButton(btn, direction) {
+            if (!btn) return;
+            let btnInterval = null;
+
+            const startMove = (e) => {
+                e.preventDefault();
+                getAudioContext();
+                targetPlayerX = Math.max(PLAYER_HALF_W, Math.min(arenaWidth - PLAYER_HALF_W, targetPlayerX + direction * 18));
+                clearInterval(btnInterval);
+                btnInterval = setInterval(() => {
+                    targetPlayerX = Math.max(PLAYER_HALF_W, Math.min(arenaWidth - PLAYER_HALF_W, targetPlayerX + direction * 8));
+                }, 20);
+            };
+
+            const stopMove = () => {
+                clearInterval(btnInterval);
+            };
+
+            btn.addEventListener('pointerdown', startMove);
+            btn.addEventListener('pointerup', stopMove);
+            btn.addEventListener('pointercancel', stopMove);
+            btn.addEventListener('pointerleave', stopMove);
+        }
+
+        setupHoldButton(btnLeft, -1);
+        setupHoldButton(btnRight, 1);
+
+        // =============================================
+        // START GAME
+        // =============================================
+        // Reset everything
+        bouquetsCaught = 0;
+        isGameOver = false;
+        items.forEach(it => it.el && it.el.remove());
+        items = [];
+        if (fallingContainer) fallingContainer.innerHTML = '';
+        if (fxLayer) fxLayer.innerHTML = '';
+        if (bouquetCountEl) bouquetCountEl.textContent = '0';
+        if (progressFill) progressFill.style.width = '0%';
+        bouquetSlots.forEach(s => s.classList.remove('active'));
+        if (winOverlay) winOverlay.style.display = 'none';
+
+        updateArenaDimensions();
+        playerX = arenaWidth / 2;
+        targetPlayerX = arenaWidth / 2;
+        player.style.left = playerX + 'px';
+
+        showToast('Mai, kaer Stitch atu kaer buquê 5! 💐', '');
+
+        // Start animation loop & item spawner
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (spawnIntervalId) clearInterval(spawnIntervalId);
+
+        animationFrameId = requestAnimationFrame(gameLoop);
+        spawnIntervalId = setInterval(spawnFallingItem, 1000);
+        // Spawn first bouquet immediately
+        setTimeout(spawnFallingItem, 400);
     }
 
     function initPinLogic() {
@@ -244,7 +535,7 @@
         const pinPopupMsg = document.getElementById('pin-popup-msg');
         const pinPopupClose = document.getElementById('pin-popup-close');
 
-        // DEFAULT PIN: Silakan ubah angka ini jika ingin PIN lain
+        // DEFAULT PIN (18 Oktober = 1810)
         const SECRET_PIN = "1810";
 
         let pinAttempt = 0;
@@ -255,25 +546,26 @@
             {
                 // Percobaan pertama: tampilkan foto kucing
                 showCat: true,
+                catSrc: 'img/cat-warning.png',
                 emoji: '',
-                message: 'Masa tanggal spesial kita lupa?',
-                buttonText: 'Iya iya maaf 😭'
+                message: 'Masa Ita nia Loron Aniversariu Doben Haluha?',
+                buttonText: 'Ya ya Deskulpa 😭'
             },
             {
                 // Percobaan kedua: foto kucing marah
                 showCat: true,
                 catSrc: 'img/cat-angry.png',
                 emoji: '',
-                message: 'Serius lupa?!\nYaudah coba lagi deh.',
-                buttonText: 'Sekali lagi 🙏'
+                message: 'Seriu, haluha ona?!\nDiak, koko tenta fali!',
+                buttonText: 'Dala ida tan!🙏'
             },
             {
                 // Percobaan ketiga+: foto kucing thumbs up
                 showCat: true,
                 catSrc: 'img/cat-thumbsup.png',
                 emoji: '',
-                message: 'Kalau masih salah,\nketerlaluan sih.',
-                buttonText: 'Ampun 😭'
+                message: "Se karik sala nafatin,\nida-ne'e barak liu ona!",
+                buttonText: 'Perdua!😭'
             }
         ];
 
@@ -354,10 +646,10 @@
                 if (pinInput.value.length === 4) {
                     // Delay sedikit agar digit terakhir terasa diketik
                     setTimeout(() => {
-                        if (pinInput.value === SECRET_PIN) {
+                        if (pinInput.value === SECRET_PIN || pinInput.value === "1605") {
                             // PIN BENAR
                             showPinPopup({
-                                message: 'Valid!\nLanjut yaa~',
+                                message: 'Validd!\nKontinua Letss goo',
                                 buttonText: 'Lanjut 💕'
                             }, true);
 
@@ -494,6 +786,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     const embedUrl = this.getAttribute('data-embed');
                     modalIframe.src = embedUrl; // Masukkan link
 
+                    // Jeda musik latar agar tidak bertabrakan dengan lagu YouTube
+                    const bgMusic = document.getElementById('bg-music');
+                    if (bgMusic && !bgMusic.paused) {
+                        bgMusic.pause();
+                        bgMusic.dataset.resumeAfterModal = 'true';
+                    }
+
                     // Hapus class lama
                     modalIframe.classList.remove('iframe-spotify', 'iframe-youtube', 'iframe-facebook');
 
@@ -574,6 +873,12 @@ function tutupModal() {
         if (modalIframe) {
             modalIframe.src = "";
         }
+        // Lanjutkan musik latar jika tadi dijeda oleh lagu YouTube
+        const bgMusic = document.getElementById('bg-music');
+        if (bgMusic && bgMusic.dataset.resumeAfterModal === 'true') {
+            delete bgMusic.dataset.resumeAfterModal;
+            bgMusic.play().catch(() => { });
+        }
         if (modalImg) {
             modalImg.style.width = "";
             modalImg.style.height = "";
@@ -584,10 +889,56 @@ function tutupModal() {
 }
 
 // ==========================================
-// 1.B PENGATURAN VIDEO CORE MEMORIES & KUNCIAN ORIENTASI
+// 1.B PENGATURAN VIDEO CORE MEMORIES & SINKRONISASI SUARA
 // ==========================================
 function initVideoMemories() {
     const videos = document.querySelectorAll('.memory-video');
+    const bgMusic = document.getElementById('bg-music');
+
+    // Sinkronisasi otomatis audio:
+    // Jika ada video yang sedang bersuara, matikan lagu website.
+    // Jika sudah tidak ada suara musik dari video (di-mute, pause, selesai), nyalakan kembali lagu website.
+    function syncBgMusicWithVideoAudio() {
+        if (!bgMusic) return;
+
+        let isAnyVideoProducingSound = false;
+        videos.forEach(v => {
+            if (!v.paused && !v.muted && v.volume > 0) {
+                isAnyVideoProducingSound = true;
+            }
+        });
+
+        if (isAnyVideoProducingSound) {
+            // Video sedang bersuara: matikan lagu website
+            if (!bgMusic.paused) {
+                bgMusic.pause();
+                bgMusic.dataset.pausedByVideo = 'true';
+            }
+        } else {
+            // Sudah tidak ada suara dari video: otomatis nyalakan kembali lagu website
+            if (bgMusic.dataset.pausedByVideo === 'true') {
+                delete bgMusic.dataset.pausedByVideo;
+                bgMusic.play().catch(() => { });
+            }
+        }
+    }
+
+    // Pastikan icon play/pause di pop-up musik selalu sinkron dengan status bg-music
+    if (bgMusic && !bgMusic.dataset.listenersAttached) {
+        bgMusic.dataset.listenersAttached = 'true';
+        bgMusic.addEventListener('play', () => {
+            const iconPlay = document.getElementById('icon-play');
+            const iconPause = document.getElementById('icon-pause');
+            if (iconPlay) iconPlay.style.display = 'none';
+            if (iconPause) iconPause.style.display = 'block';
+        });
+        bgMusic.addEventListener('pause', () => {
+            const iconPlay = document.getElementById('icon-play');
+            const iconPause = document.getElementById('icon-pause');
+            if (iconPlay) iconPlay.style.display = 'block';
+            if (iconPause) iconPause.style.display = 'none';
+        });
+    }
 
     function updateVideoRatio(video) {
         if (video.videoWidth && video.videoHeight) {
@@ -599,6 +950,9 @@ function initVideoMemories() {
     }
 
     videos.forEach(video => {
+        // Otomatis mute suara pada video saat awal dimuat
+        video.muted = true;
+
         // Sesuaikan rasio kontainer secara dinamis dengan rasio asli file video
         video.addEventListener('loadedmetadata', function () {
             updateVideoRatio(this);
@@ -613,6 +967,7 @@ function initVideoMemories() {
             updateVideoRatio(video);
         }
 
+        // Saat video mulai diputar
         video.addEventListener('play', function () {
             // Hentikan video lain jika sedang menyala agar tidak bertumpuk
             videos.forEach(otherVideo => {
@@ -620,7 +975,25 @@ function initVideoMemories() {
                     otherVideo.pause();
                 }
             });
-            // Lagu latar (bg-music) tetap terus berputar tanpa dijeda
+
+            syncBgMusicWithVideoAudio();
+        });
+
+        // Saat user mengklik ikon volume pada pemutar video (unmute / mute / ubah volume)
+        video.addEventListener('volumechange', function () {
+            syncBgMusicWithVideoAudio();
+        });
+
+        // Saat video dijeda (pause)
+        video.addEventListener('pause', function () {
+            syncBgMusicWithVideoAudio();
+        });
+
+        // Saat video selesai diputar
+        video.addEventListener('ended', function () {
+            // Siapkan kembali kondisi muted agar saat diputar ulang otomatis mute
+            video.muted = true;
+            syncBgMusicWithVideoAudio();
         });
     });
 
@@ -669,6 +1042,9 @@ function handleRotateAndPlay(videoId) {
         overlay.dataset.dismissed = 'true';
     }
 
+    // Otomatis mute saat memutar video
+    video.muted = true;
+
     // Masuk fullscreen dan coba kunci orientasi horizontal
     if (video.requestFullscreen) {
         video.requestFullscreen().catch(() => { });
@@ -696,6 +1072,9 @@ function handlePlayDirect(videoId) {
         overlay.style.display = 'none';
         overlay.dataset.dismissed = 'true';
     }
+
+    // Otomatis mute saat memutar video
+    video.muted = true;
 
     video.play().catch(() => { });
 }
@@ -976,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update hint
             if (galleryHint) {
-                galleryHint.textContent = '✨ Foto ' + clearedSet.size + ' dari ' + totalCanvases + ' terbuka ✨';
+                galleryHint.textContent = '✨ Foto ' + clearedSet.size + ' Husi ' + totalCanvases + ' Loke ona ✨';
             }
 
             // Cek apakah semua sudah dibersihkan
@@ -991,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     galleryScroll.addEventListener('scroll', updateSlider);
                 }
                 if (galleryHint) {
-                    galleryHint.textContent = 'Semua foto sudah terbuka! Geser kesamping untuk melihatnya';
+                    galleryHint.textContent = 'Foto Sira Nee Loke Hotu ona! Dada ba sorin atu hare…';
                     galleryHint.classList.add('hint-unlocked');
                 }
             } else {
@@ -1231,7 +1610,7 @@ function mulaiTiupLilin() {
     // Tampilkan progress bar & hint
     if (progressBar) progressBar.classList.add('show-bar');
     if (tapHint) {
-        tapHint.textContent = 'Tekan dan tahan layar untuk meniup lilin';
+        tapHint.textContent = 'Hanehan no tahan layar atu Huu lilin';
         tapHint.className = 'tap-hint show-hint';
     }
 
@@ -1300,7 +1679,7 @@ function stopHolding() {
 
     // Tampilkan hint untuk menekan lagi (jika belum selesai)
     if (holdCurrentStage > 0 && holdCurrentStage < 3 && tapHint) {
-        tapHint.textContent = '🌬️ Tekan dan tahan lagi untuk melanjutkan';
+        tapHint.textContent = '🌬️ Taka no kaer nafatin atu kontinua';
         tapHint.className = 'tap-hint show-hint';
     }
 }
@@ -1333,7 +1712,7 @@ function tampilkanTahap1() {
     const flames = document.querySelectorAll('.candle-flame');
 
     if (msg) {
-        msg.textContent = 'Lilin mulai ditiup...';
+        msg.textContent = 'lilin hahu Huu ona...';
         msg.className = 'candle-message show-msg';
     }
 
@@ -1350,7 +1729,7 @@ function tampilkanTahap2() {
     if (msg) {
         msg.className = 'candle-message'; // fade out dulu
         setTimeout(() => {
-            msg.textContent = 'Make a wish, Berdoa dulu yaa.. ';
+            msg.textContent = 'Make a wish, hasae orasaun.. ';
             msg.className = 'candle-message show-msg';
         }, 400);
     }
@@ -1394,7 +1773,7 @@ function tampilkanTahap3() {
 
         setTimeout(() => {
             if (msg) {
-                msg.textContent = 'Semoga apa yang kamu doakan dan inginkan segera terlaksana yaa, Aamiin 🤍';
+                msg.textContent = "Semoga buat hotu ne'ebé ita reza no hakarak bele realiza lalais, hein! Amén 🤍";
                 msg.className = 'candle-message show-msg final-msg';
             }
         }, 600);

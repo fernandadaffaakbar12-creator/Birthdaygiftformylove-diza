@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Happy Birthday My Love Siti Umu Salwa!</title>
+    <title>Happy Birthday My Love Diza F. S. Pereira!</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Outfit:wght@300;400;600&display=swap"
         rel="stylesheet">
@@ -13,7 +13,7 @@
 
 <body>
     <audio id="bg-music" loop>
-        <source src="audio/Shape-of-My-Heart.mp3" type="audio/mpeg">
+        <source src="audio/Ronan Keating - This I Promise You.mp3" type="audio/mpeg">
     </audio>
 
     <div id="music-popup" class="music-popup">
@@ -21,9 +21,9 @@
         <img src="img/2.jpeg" alt="Album Cover" class="album-cover">
         <div class="music-info">
             <div class="song-title-wrapper">
-                <p class="song-title">Shape Of My Heart</p>
+                <p class="song-title">This I Promise You</p>
             </div>
-            <p class="artist-name">Backstreet Boys</p>
+            <p class="artist-name">Ronan Keating</p>
         </div>
         <button id="play-pause-btn" class="play-pause-btn" onclick="toggleMusic()">
             <!-- SVG Pause Icon -->
@@ -54,93 +54,76 @@
 
         <div class="game-glass-panel">
             <div class="game-title-wrapper">
-                <h2 class="aesthetic-font game-title-text">Mini Game!</h2>
+                <span class="game-title-icon">💐</span>
+                <h2 class="aesthetic-font game-title-text">Kaer Buquê! 💐</h2>
+                <span class="game-title-icon">💐</span>
             </div>
-            <p class="game-subtitle">Tolong bantu anterin bouquetnya ke nailong<br><span class="game-subtitle-warn">⚠️
-                    Hindari monster & jangan keluar rel!</span></p>
+            <p class="game-subtitle">
+                Ajuda Stitch atu kaer <strong>pelumenus buquê flores 5.</strong>! 🌸<br>
+                <span class="game-subtitle-warn">⚠️ Kuidadu! Keta kaer bomba 💣 ka halo buquê fila fali ba 0!</span>
+            </p>
 
-            <div id="game-area">
-                <!-- SVG Rail Track - HORIZONTAL left to right -->
-                <svg id="game-svg" viewBox="0 0 500 250" preserveAspectRatio="none">
-                    <defs>
-                        <filter id="rail-glow">
-                            <feGaussianBlur stdDeviation="2" result="blur" />
-                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                        </filter>
-                    </defs>
+            <!-- Score & Progress Container -->
+            <div class="game-score-card">
+                <div class="game-score-label">
+                    <span class="score-text">Buquê Halibur:</span>
+                    <span class="game-score-number"><span id="bouquet-count">0</span> / 5</span>
+                </div>
+                <div class="bouquet-slots" id="bouquet-slots">
+                    <div class="b-slot" data-index="1">💐</div>
+                    <div class="b-slot" data-index="2">💐</div>
+                    <div class="b-slot" data-index="3">💐</div>
+                    <div class="b-slot" data-index="4">💐</div>
+                    <div class="b-slot" data-index="5">💐</div>
+                </div>
+                <div class="game-progress-bar">
+                    <div class="game-progress-fill" id="game-progress-fill"></div>
+                </div>
+            </div>
 
-                    <!-- Outer glow of rail -->
-                    <path id="rail-glow-path"
-                        d="M 15,125 C 60,30 120,30 165,125 C 210,220 270,220 315,125 C 360,30 420,30 485,125"
-                        fill="none" stroke="rgba(180, 20, 100,0.15)" stroke-width="36" stroke-linecap="round"
-                        stroke-linejoin="round" />
+            <!-- Dynamic Alert Toast -->
+            <div id="game-toast" class="game-toast">Mai, kaer Stitch atu kaer buquê sira! ✨</div>
 
-                    <!-- Main rail (safe path) - winding S-curve horizontal -->
-                    <path id="safe-path"
-                        d="M 15,125 C 60,30 120,30 165,125 C 210,220 270,220 315,125 C 360,30 420,30 485,125"
-                        fill="none" stroke="#8b005d" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"
-                        filter="url(#rail-glow)" />
+            <!-- Game Arena for Falling Objects and Stitch -->
+            <div id="game-area" class="falling-game-area">
+                <!-- Floating background sparkles inside arena -->
+                <div class="arena-stars"></div>
 
-                    <!-- Inner rail line (lighter) for railroad effect -->
-                    <path d="M 15,125 C 60,30 120,30 165,125 C 210,220 270,220 315,125 C 360,30 420,30 485,125"
-                        fill="none" stroke="#c71585" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+                <!-- Container for dynamically falling bouquets and bombs -->
+                <div id="falling-items-container"></div>
 
-                    <!-- Center dashed line (rail ties) -->
-                    <path d="M 15,125 C 60,30 120,30 165,125 C 210,220 270,220 315,125 C 360,30 420,30 485,125"
-                        fill="none" stroke="#5a0022" stroke-width="2" stroke-dasharray="8,12" stroke-linecap="round" />
+                <!-- Floating Score Effect Container -->
+                <div id="fx-layer" class="fx-layer"></div>
 
-                    <!-- Decorative rail ties (crossbars) along the path - vertical lines -->
-                    <g class="rail-ties" opacity="0.3">
-                        <line x1="15" y1="115" x2="15" y2="135" stroke="#5a0022" stroke-width="2" />
-                        <line x1="45" y1="75" x2="45" y2="95" stroke="#5a0022" stroke-width="2" />
-                        <line x1="75" y1="45" x2="75" y2="65" stroke="#5a0022" stroke-width="2" />
-                        <line x1="105" y1="35" x2="105" y2="55" stroke="#5a0022" stroke-width="2" />
-                        <line x1="135" y1="65" x2="135" y2="85" stroke="#5a0022" stroke-width="2" />
-                        <line x1="165" y1="115" x2="165" y2="135" stroke="#5a0022" stroke-width="2" />
-                        <line x1="195" y1="165" x2="195" y2="185" stroke="#5a0022" stroke-width="2" />
-                        <line x1="225" y1="200" x2="225" y2="220" stroke="#5a0022" stroke-width="2" />
-                        <line x1="255" y1="210" x2="255" y2="230" stroke="#5a0022" stroke-width="2" />
-                        <line x1="285" y1="185" x2="285" y2="205" stroke="#5a0022" stroke-width="2" />
-                        <line x1="315" y1="115" x2="315" y2="135" stroke="#5a0022" stroke-width="2" />
-                        <line x1="345" y1="65" x2="345" y2="85" stroke="#5a0022" stroke-width="2" />
-                        <line x1="375" y1="35" x2="375" y2="55" stroke="#5a0022" stroke-width="2" />
-                        <line x1="405" y1="35" x2="405" y2="55" stroke="#5a0022" stroke-width="2" />
-                        <line x1="435" y1="55" x2="435" y2="75" stroke="#5a0022" stroke-width="2" />
-                        <line x1="465" y1="95" x2="465" y2="115" stroke="#5a0022" stroke-width="2" />
-                        <line x1="485" y1="115" x2="485" y2="135" stroke="#5a0022" stroke-width="2" />
-                    </g>
-                </svg>
-
-                <!-- Track sparkle particles -->
-                <div class="track-sparkles"></div>
-
-                <!-- Pemain - Tongkang Kayu dengan Bouquet -->
-                <div id="player-obj">
-                    <span class="player-glow"></span>
-                    <div class="cart-body">
-                        <img src="img/bouquet.png" alt="Bouquet" class="cart-bouquet-img">
+                <!-- Player Character (Stitch / Dino) -->
+                <div id="player-catcher" class="player-catcher">
+                    <div class="catcher-basket">
+                        <span class="basket-glow"></span>
                     </div>
-                    <div class="cart-base"></div>
-                    <div class="cart-wheel cart-wheel-l"></div>
-                    <div class="cart-wheel cart-wheel-r"></div>
+                    <img src="img/dino.png" alt="Stitch" id="catcher-img" class="catcher-img">
+                    <div class="catcher-dizzy-stars" id="catcher-dizzy-stars">💫😵💫</div>
                 </div>
 
-                <!-- Monster 1 & 2 -->
-                <div id="monster-1" class="monster"><span class="monster-danger-zone"></span>👾</div>
-                <div id="monster-2" class="monster"><span class="monster-danger-zone"></span>👾</div>
-
-                <!-- Garis Akhir (Dinosaurus) -->
-                <div id="finish-line">
-                    <span class="finish-pulse"></span>
-                    <img src="img/dino.png" alt="Dino" class="finish-img">
+                <!-- Win Overlay Animation -->
+                <div id="game-win-overlay" class="game-win-overlay" style="display: none;">
+                    <div class="win-content">
+                        <img src="img/BouquetBunga.png" alt="Stitch Menang" class="win-stitch-img">
+                        <h3 class="win-title aesthetic-font">Yeeey, Konsege! 🎉</h3>
+                        <p class="win-desc">Buquê 5 resin halibur ona ba ita! 💕</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- Progress indicator -->
-            <div class="game-progress-bar">
-                <div class="game-progress-fill" id="game-progress-fill"></div>
+            <!-- On-screen controls & hint -->
+            <div class="game-bottom-bar">
+                <div class="game-touch-controls">
+                    <button type="button" class="game-ctrl-btn" id="btn-move-left" aria-label="Geser Kiri">◀
+                        Kiri</button>
+                    <span class="game-hint-text">✨ Desliza ekran / uza botão ✨</span>
+                    <button type="button" class="game-ctrl-btn" id="btn-move-right" aria-label="Geser Kanan">Kanan
+                        ▶</button>
+                </div>
             </div>
-            <p class="game-hint-text">✨ Seret tongkang pelan-pelan di atas rel ke kanan ✨</p>
         </div>
     </div>
 
@@ -148,8 +131,8 @@
     <div id="pin-screen" style="display: flex;" class="active">
         <div class="pin-container glass-panel">
             <h2>Enter PIN</h2>
-            <p style="margin-bottom: 2px;">passwordnya tanggal + bulan lahir kamu yaa.</p>
-            <p style="margin-top: 0; font-size: 0.5rem;"> (Gamungkin lupa dong)</p>
+            <p style="margin-bottom: 2px;">Password Dia ho Fulan ita nia aniversariu.</p>
+            <p style="margin-top: 0; font-size: 0.5rem;"> (Ita boot haluha Mak hare!!)</p>
             <input type="password" id="pin-input" maxlength="4" placeholder="****" inputmode="numeric" pattern="[0-9]*">
         </div>
     </div>
@@ -167,7 +150,7 @@
     <div id="landing-page" style="display: none;">
         <div class="bouquet-container" onclick="bukaKado()">
             <img src="img/BouquetBunga.png" alt="BouquetBunga" class="bouquet-img">
-            <p class="click-text">nailong mau kasih bouqet ini buat kamu<br>(pencet nailong nya) </p>
+            <p class="click-text">Stitch Atu fo Bouqet ba doben<br>(Hanehan Liman Ba Stitch) </p>
         </div>
     </div>
 
@@ -177,34 +160,44 @@
             <h1 class="aesthetic-font fade-in-text">Happy Birthday,<br>My Favorite Person</h1>
             <p class="aesthetic-font fade-in-text"
                 style="font-size: 1.3rem; color: #c71585; margin-top: 10px; margin-bottom: 10px; letter-spacing: 2px;">-
-                Siti Umu Salwa -</p>
+                Diza Fatima -</p>
             <img src="img/foto-pacar.png" alt="Foto Pacar" class="birthday-photo fade-in-text">
-            <p class="typing-text">Hari ini jadi salah satu hari yang spesial, karena di hari ini tepat pada tanggal 18
-                Oktober adalah hari dimana kamu lahir dan tumbuh.</p>
+            <p class="typing-text">Iha doben nia loron espesial ida ne'e, hau hakarak Dehan Deit, espera doben sempre
+                hanoin katak doben ne folin boot no merese atu hetan buat diak barak. Hanoin ba hanoin hamnasa mesmesak
+                hanoin kona fali ba momento Iha Secundario ne'eba ita Primeira vez konese malu doben sei moe moe hela,
+                maibe ita halao to ita toman malu ho diak. </p>
+
             <p class="typing-text">
-                Selamat bertambah usia sayangg. Semoga dipermudah setiap langkah yang kamu ambil dan semoga setiap
-                harinya kamu selalu punya alasan untuk tersenyum bahagia. Semoga di usia yang baru ini kamu semakin kuat
-                menghadapi segala hal, semakin dekat dengan apa yang kamu impikan, dan selalu dikelilingi orang-orang
-                yang tulus menyayangi kamu.</p>
+                No Iha doben nia loron espesial ida ne, hau atu dehan nafatin sai doben nia an rasik, Ne'ebe dalam ruma
+                Hirus, gosta han lahotu, halo buat random, maibe nafatin sai Diza ne'ebe mak hau konese ne'e. Espera
+                Tinan foun ida ne'e buat hotu lao ho diak iha doben nia loron-loron. </p>
 
-            <div class="pulsating-heart">🤍</div>
+            <p class="typing-text">
+                And Parabens hakat tan ba paço foun. Sai nafatin doben nia versaun nebe hau konese. Love you Doben
+            </p>
 
-            <p class="scroll-hint">✨Scroll pelan-pelan ke bawah yaa✨</p>
+            <div class="pulsating-heart">❤️</div>
+
+            <p class="scroll-hint">✨Scroll neneik ba okos yaa doben✨</p>
         </section>
 
         <section class="slide glass-panel show-on-scroll">
             <h2 class="baby-pink-text" style="font-style: italic;">A little prayer for you.</h2>
-            <p class="fade-in-text">Semoga di usia yang baru ini, kamu selalu dikelilingi hal-hal baik, orang-orang yang
-                tulus, dan banyak alasan untuk bahagia. Semoga semua yang sedang kamu usahakan perlahan menemukan hasil
-                yang kamu harapkan, dan hal-hal yang selama ini kamu doakan diam-diam bisa satu per satu terwujud. Apa
-                pun yang sedang kamu kejar, semoga jalannya selalu dipermudah. Dan semoga, di antara banyak hal baik
-                yang datang nanti, ada juga banyak momen yang bisa kita nikmati dan ceritakan bareng.</p>
-            <p class="fade-in-text">aku berharap di tahun ini, hari ulang tahunmu bisa menjadi salah satu hari yang
-                penuh dengan kebahagiaan sayangg, bukan justru menjadi hari yang membuatmu merasa sedih.
-                karena menurut aku, kamu itu pantas mendapatkan hari ulang tahun yang indah, ceria, dan kenangan baik
-                yang bisa kamu ingat nantinya. aku cuma ingin kamu tahu bahwa di hari spesial kamu ini, aku benar-benar
-                berharap kamu bisa merasa bahagia, bukan hanya hari ini, tetapi juga di hari-hari yang akan datang
-                sayanggg.</p>
+            <p class="fade-in-text">Maun jesus haraik bensaun ba Diza Fátima Sarmento Pereira ne'ebé ohin loron diza
+                hakat ona ba Paso ida tan. Haraik bensaun esperitu matenek esperitu domin, no haraik bensaun mos ba nia
+                saúde atu nia halo nia atividade loron-loron nian ho diak.</p>
+
+            <p class="fade-in-text">"Hein katak iha tinan foun ne'e, ó sempre hale'u hosi buat di'ak sira, ema sira
+                ne'ebé laran-moos, no iha razaun barak atu haksolok. Hein katak buat hotu ne'ebé ó koko daudaun ne'e
+                neineik-neineik hetan rezultadu ne'ebé ó hein, no buat sira ne'ebé durante ne'e ó husu iha orasaun bele
+                sai realidade. Saida de'it mak ó buka daudaun, hein katak dalan sempre fasil. No hein katak, iha buat
+                di'ak barak nia laran ne'ebé sei mai aban-bainrua, iha mós momentu barak ne'ebé ita bele goza no konta
+                ba malu hamutuk.</p>
+
+            <p class="fade-in-text">Ha'u mós hein katak, ba oin doben sempre hale'u husi ema di'ak sira ne'ebé bele halo
+                doben nia loron-loron sente kmaan liu. Hein katak wainhira doben kole, sempre iha buat ki'ik ne'ebé bele
+                fó fali doben nia laran-manas, Sai nafatin oan ne'ebé rona Pãe mãe. Sai mos Bin no alin diak no rona ba
+                maun alin sira iha uma laran. Sai nafatin hau nia doben ne'ebé diak.</p>
         </section>
 
         <section class="slide photo-panel show-on-scroll">
@@ -216,19 +209,28 @@
             <div class="solar-system">
                 <div class="orbit-track">
 
-                    <div class="planet-card item1" data-caption="Shusi Aeon">
+                    <div class="planet-card item1" data-caption="Bakso">
                         <img src="img/favorite-food.jpg" alt="Food">
                         <p class="planet-caption">Your favorite food</p>
                     </div>
 
-                    <div class="planet-card item2" data-caption="Tianlala">
+                    <div class="planet-card item2" data-caption="Es Teler">
                         <img src="img/favorite-drink.jpg" alt="Drink">
                         <p class="planet-caption">Your favorite drink</p>
                     </div>
 
-                    <div class="planet-card item3" data-caption="Dicky">
+                    <div class="planet-card item3" data-caption="Helder Abel Freitas">
                         <img src="img/favorite-person.jpg" alt="Person">
                         <p class="planet-caption">Your favorite person</p>
+                    </div>
+
+                    <div class="planet-card item4 planet-music" data-caption="MAI HAU MAK HAMAUS - Gantajo Music"
+                        data-embed="https://www.youtube.com/embed/1y37q1IJeqw?si=7NkbEZ9j365WAgqn">
+                        <div class="music-thumb">
+                            <img src="https://img.youtube.com/vi/1y37q1IJeqw/hqdefault.jpg" alt="Favorite Music">
+                            <span class="music-play-btn" aria-hidden="true">▶</span>
+                        </div>
+                        <p class="planet-caption">Your favorite music 🎵</p>
                     </div>
 
                 </div>
@@ -261,8 +263,20 @@
                     <img src="img/4.jpeg" alt="Kenangan 4">
                     <canvas class="scratch-canvas"></canvas>
                 </div>
+                <div class="scratch-card">
+                    <img src="img/5.jpeg" alt="Kenangan 5">
+                    <canvas class="scratch-canvas"></canvas>
+                </div>
+                <div class="scratch-card">
+                    <img src="img/6.jpeg" alt="Kenangan 6">
+                    <canvas class="scratch-canvas"></canvas>
+                </div>
+                <div class="scratch-card">
+                    <img src="img/7.jpeg" alt="Kenangan 7">
+                    <canvas class="scratch-canvas"></canvas>
+                </div>
             </div>
-            <p id="gallery-hint" class="gallery-hint">✨ Gosok semua fotonya dulu yaa! ✨</p>
+            <p id="gallery-hint" class="gallery-hint">✨ dudu/hamos foto ne lai doben! ✨</p>
             <div id="gallery-slider" class="gallery-slider">
                 <div class="gallery-slider-track">
                     <div id="gallery-slider-thumb" class="gallery-slider-thumb"></div>
@@ -280,7 +294,7 @@
                     <!-- Video Card 1 -->
                     <div class="video-card-item">
                         <div class="video-frame-container">
-                            <video id="video-memories-1" class="memory-video" playsinline controls preload="metadata">
+                            <video id="video-memories-1" class="memory-video" playsinline controls preload="metadata" muted>
                                 <source src="video/1.MOV" type="video/mp4; codecs=hevc">
                                 <source src="video/1.MOV" type="video/quicktime">
                                 <source src="video/1.MOV" type="video/mp4">
@@ -302,15 +316,14 @@
                                         <polygon points="46,40 50,45 52,38" fill="#ff1493" />
                                     </svg>
                                 </div>
-                                <p class="rotate-hint-title">Putar Handphone Kamu</p>
-                                <p class="rotate-hint-desc">Ubah ke posisi horizontal (landscape) untuk tampilan layar
-                                    penuh, atau putar langsung di sini yaa</p>
+                                <p class="rotate-hint-title">Hanehan Ba button Nee</p>
+                                <p class="rotate-hint-desc">(Landscape) Atu Start Video ne</p>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
                                     <button class="btn-rotate-play" onclick="handleRotateAndPlay(1)">
-                                        <span class="btn-icon">📺</span> Layar Penuh
+                                        <span class="btn-icon">📺</span> Hanehan Ba button Nee
                                     </button>
                                     <button class="btn-rotate-play btn-play-direct" onclick="handlePlayDirect(1)">
-                                        <span class="btn-icon">▶</span> Tonton di Sini
+                                        <span class="btn-icon">▶</span> Haree iha Ne'e
                                     </button>
                                 </div>
                             </div>
@@ -320,7 +333,7 @@
                     <!-- Video Card 2 -->
                     <div class="video-card-item">
                         <div class="video-frame-container">
-                            <video id="video-memories-2" class="memory-video" playsinline controls preload="metadata">
+                            <video id="video-memories-2" class="memory-video" playsinline controls preload="metadata" muted>
                                 <source src="video/2.MOV" type="video/mp4; codecs=hevc">
                                 <source src="video/2.MOV" type="video/quicktime">
                                 <source src="video/2.MOV" type="video/mp4">
@@ -342,15 +355,14 @@
                                         <polygon points="46,40 50,45 52,38" fill="#ff1493" />
                                     </svg>
                                 </div>
-                                <p class="rotate-hint-title">Putar Handphone Kamu</p>
-                                <p class="rotate-hint-desc">Ubah ke posisi horizontal (landscape) untuk tampilan layar
-                                    penuh, atau putar langsung di sini yaa</p>
+                                <p class="rotate-hint-title">Hanehan Ba button Nee</p>
+                                <p class="rotate-hint-desc">(Landscape) Atu Start Video ne</p>
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
                                     <button class="btn-rotate-play" onclick="handleRotateAndPlay(2)">
-                                        <span class="btn-icon">📺</span> Layar Penuh
+                                        <span class="btn-icon">📺</span> Hanehan Ba button Nee
                                     </button>
                                     <button class="btn-rotate-play btn-play-direct" onclick="handlePlayDirect(2)">
-                                        <span class="btn-icon">▶</span> Tonton di Sini
+                                        <span class="btn-icon">▶</span> Haree iha Ne'e
                                     </button>
                                 </div>
                             </div>
@@ -388,43 +400,21 @@
                     </div>
                 </div>
             </div>
-            <p class="gallery-hint" style="margin-top: 15px;">✨ Klik fotonya untuk memperbesar ✨</p>
+            <p class="gallery-hint" style="margin-top: 15px;">✨ Klik ba foto ne atu hare detail liu ✨</p>
         </section>
 
         <section class="slide glass-panel show-on-scroll">
             <h1 class="aesthetic-font">You Are My Universe</h1>
 
-            <p class="typing-text" style="margin-top: 25px; margin-bottom: 15px;">
-                Di hari spesial kamu ini, aku cuma mau bilang, semoga kamu selalu ingat kalau kamu itu berharga dan
-                pantas mendapatkan banyak hal baik. kalau dipikir-pikir, lucu juga ya, kita pernah pacaran pas sd mana
-                lumayan lama 8/9 bulan, walaupun kita gatau selama pacarannya kayak gimana/ngapain aja hhe. lalu sempet
-                berpisah dan akhirnya dipertemukan lagi. selama waktu itu, mungkin kita sama-sama menjalani kehidupan
-                dan punya cerita masing-masing, sampai akhirnya bisa saling kenal dan hadir lagi dalam cerita satu sama
-                lain seperti sekarang.
-            </p>
-
-            <p class="typing-text" style="margin-top: 25px; margin-bottom: 15px;">
-                makasii sayang udah jadi bagian dari hari hari aku selama ini. dari awal yang mungkin cuma bikin streak
-                tiktok, kirim kirim vid random terus jadi sering cerita, bercanda, atau bahas hal-hal random yang kadang
-                nggak jelas. aku seneng banget kita dipertemukan lagi dengan berbagai cerita kita. nggak semua momen
-                harus jadi sesuatu yang besar, kadang ngobrol sebentar atau dengerin cerita kamu aja udah cukup bikin
-                hari terasa beda. semoga nanti kita masih sering ngobrol, masih bisa saling cerita, dan tetap nyaman
-                satu sama lain seperti sekarang. pokonya, semoga kamu selalu baik-baik aja. dan kalau suatu saat nanti
-                banyak hal berubah, semoga kita tetap jadi dua orang yang masih bisa saling sayang dan cinta satu sama
-                lain.
-            </p>
-
-            <p class="typing-text" style="margin-bottom: 40px;">
-                selamat bertambah usia sayangg. semoga kamu selalu punya alasan buat senyum, dan semoga aku masih bisa
-                jadi salah satu orang yang ikut lihat kamu tumbuh jadi versi kamu yang lebih baik.</p>
-
             <hr style="border: 0; border-top: 1px solid rgba(255, 105, 180, 0.3); margin-bottom: 20px;">
-            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Dari orang yang paling bersyukur mengenalmu,
+            <p style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 5px;">Husi Ema Neebe mak Argradese Tebes Bele
+                konese, doben.
             </p>
-            <p class="sender-name aesthetic-font baby-pink-text" style="font-size: 2rem; margin-top: 5px;">Dicky</p>
+            <p class="sender-name aesthetic-font baby-pink-text" style="font-size: 2rem; margin-top: 5px;">Helder A.
+                Freitas</p>
 
             <!-- Tombol Tiup Lilin -->
-            <button id="btn-tiup-lilin" class="btn-tiup-lilin" onclick="bukaHalamanLilin()">🎂 Tiup Lilin</button>
+            <button id="btn-tiup-lilin" class="btn-tiup-lilin" onclick="bukaHalamanLilin()">🎂 Huu lilin!</button>
         </section>
 
         <!-- HALAMAN TIUP LILIN (Full Screen Overlay) -->
@@ -434,7 +424,7 @@
             <img src="img/astronaut2.png" alt="Astronaut Rocket" class="astronaut-bg-2">
 
             <!-- Tombol Kembali -->
-            <button id="btn-back-candle" class="btn-back-candle" onclick="tutupHalamanLilin()">← Kembali</button>
+            <button id="btn-back-candle" class="btn-back-candle" onclick="tutupHalamanLilin()">← Back</button>
 
             <div class="candle-page-content">
                 <p id="candle-message" class="candle-message"></p>
@@ -457,7 +447,7 @@
                                 <div class="flame-inner"></div>
                             </div>
                             <div class="candle-number-body">
-                                <span class="candle-digit">0</span>
+                                <span class="candle-digit">1</span>
                             </div>
                         </div>
                     </div>
@@ -482,7 +472,7 @@
                     <div id="hold-progress-fill" class="hold-progress-fill"></div>
                 </div>
 
-                <button id="btn-mulai-tiup" class="btn-mulai-tiup" onclick="mulaiTiupLilin()">Mulai Tiup Lilin</button>
+                <button id="btn-mulai-tiup" class="btn-mulai-tiup" onclick="mulaiTiupLilin()">Hahu Huu lilin.</button>
                 <p id="tap-hint" class="tap-hint"></p>
             </div>
         </div>
